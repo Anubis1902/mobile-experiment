@@ -18,24 +18,30 @@
     <button id="startBtn">开始试验</button>
     <button id="continueBtn" style="display:none;">状态持续</button>
     <button id="endBtn" style="display:none;">状态结束</button>
+    <button id="exportBtn">导出数据</button>
 
     <script>
         let mentalOpDuration = 10000; // 10秒
         let stateMeasureInterval = 5000; // 5秒
         let stateDuration = 0;
         let timer;
+        let trialNumber = 0;
+        let results = [];
 
         const circle = document.getElementById('circle');
         const message = document.getElementById('message');
         const startBtn = document.getElementById('startBtn');
         const continueBtn = document.getElementById('continueBtn');
         const endBtn = document.getElementById('endBtn');
+        const exportBtn = document.getElementById('exportBtn');
 
         startBtn.addEventListener('click', startTrial);
         continueBtn.addEventListener('click', continueState);
         endBtn.addEventListener('click', endTrial);
+        exportBtn.addEventListener('click', exportData);
 
         function startTrial() {
+            trialNumber++;
             startBtn.style.display = 'none';
             circle.style.backgroundColor = 'red';
             message.textContent = '正在进行心理操作...';
@@ -69,8 +75,29 @@
             endBtn.style.display = 'none';
             startBtn.style.display = 'inline';
             message.textContent = `试验结束。状态持续时间：${stateDuration / 1000}秒`;
-            // 这里可以添加数据保存逻辑
+            
+            // 保存数据
+            results.push({trial: trialNumber, duration: stateDuration / 1000});
+            localStorage.setItem('experimentResults', JSON.stringify(results));
+            
             stateDuration = 0;
+        }
+
+        function exportData() {
+            const data = localStorage.getItem('experimentResults');
+            if (data) {
+                const blob = new Blob([data], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'experiment_results.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else {
+                alert('没有可导出的数据');
+            }
         }
     </script>
 </body>
