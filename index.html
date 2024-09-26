@@ -9,40 +9,83 @@
         #circle { width: 100px; height: 100px; border-radius: 50%; margin: 20px auto; }
         button { font-size: 18px; padding: 10px 20px; margin: 10px; }
         #message { font-size: 16px; margin: 20px 0; }
+        .input-group { margin: 10px 0; }
+        .input-group label { display: inline-block; width: 150px; text-align: right; }
+        .input-group input { width: 100px; }
     </style>
 </head>
 <body>
     <h1>移动实验</h1>
-    <div id="circle"></div>
-    <div id="message"></div>
-    <button id="startBtn">开始试验</button>
-    <button id="continueBtn" style="display:none;">状态持续</button>
-    <button id="endBtn" style="display:none;">状态结束</button>
-    <button id="exportBtn">导出数据</button>
+    <div id="setup">
+        <div class="input-group">
+            <label for="mentalOpDuration">心理操作时间 (秒):</label>
+            <input type="number" id="mentalOpDuration" value="10">
+        </div>
+        <div class="input-group">
+            <label for="stateMeasureInterval">状态检测间隔 (秒):</label>
+            <input type="number" id="stateMeasureInterval" value="5">
+        </div>
+        <div class="input-group">
+            <label for="numTrials">试验次数:</label>
+            <input type="number" id="numTrials" value="5">
+        </div>
+        <button id="startExperimentBtn">开始实验</button>
+    </div>
+    <div id="experiment" style="display:none;">
+        <div id="circle"></div>
+        <div id="message"></div>
+        <button id="startTrialBtn">开始试验</button>
+        <button id="continueBtn" style="display:none;">状态持续</button>
+        <button id="endBtn" style="display:none;">状态结束</button>
+    </div>
+    <div id="results" style="display:none;">
+        <h2>实验结果</h2>
+        <div id="resultsSummary"></div>
+        <button id="exportBtn">导出数据 (CSV)</button>
+        <button id="restartBtn">重新开始</button>
+    </div>
 
     <script>
-        let mentalOpDuration = 10000; // 10秒
-        let stateMeasureInterval = 5000; // 5秒
+        let mentalOpDuration, stateMeasureInterval, numTrials;
+        let currentTrial = 0;
         let stateDuration = 0;
         let timer;
-        let trialNumber = 0;
         let results = [];
 
+        const setupDiv = document.getElementById('setup');
+        const experimentDiv = document.getElementById('experiment');
+        const resultsDiv = document.getElementById('results');
         const circle = document.getElementById('circle');
         const message = document.getElementById('message');
-        const startBtn = document.getElementById('startBtn');
+        const startExperimentBtn = document.getElementById('startExperimentBtn');
+        const startTrialBtn = document.getElementById('startTrialBtn');
         const continueBtn = document.getElementById('continueBtn');
         const endBtn = document.getElementById('endBtn');
         const exportBtn = document.getElementById('exportBtn');
+        const restartBtn = document.getElementById('restartBtn');
 
-        startBtn.addEventListener('click', startTrial);
+        startExperimentBtn.addEventListener('click', startExperiment);
+        startTrialBtn.addEventListener('click', startTrial);
         continueBtn.addEventListener('click', continueState);
         endBtn.addEventListener('click', endTrial);
         exportBtn.addEventListener('click', exportData);
+        restartBtn.addEventListener('click', restart);
+
+        function startExperiment() {
+            mentalOpDuration = parseInt(document.getElementById('mentalOpDuration').value) * 1000;
+            stateMeasureInterval = parseInt(document.getElementById('stateMeasureInterval').value) * 1000;
+            numTrials = parseInt(document.getElementById('numTrials').value);
+            setupDiv.style.display = 'none';
+            experimentDiv.style.display = 'block';
+            currentTrial = 0;
+            results = [];
+            startTrialBtn.style.display = 'inline';
+            message.textContent = '点击"开始试验"按钮开始第一个试验';
+        }
 
         function startTrial() {
-            trialNumber++;
-            startBtn.style.display = 'none';
+            currentTrial++;
+            startTrialBtn.style.display = 'none';
             circle.style.backgroundColor = 'red';
             message.textContent = '正在进行心理操作...';
 
@@ -73,31 +116,57 @@
             circle.style.backgroundColor = 'transparent';
             continueBtn.style.display = 'none';
             endBtn.style.display = 'none';
-            startBtn.style.display = 'inline';
-            message.textContent = `试验结束。状态持续时间：${stateDuration / 1000}秒`;
             
-            // 保存数据
-            results.push({trial: trialNumber, duration: stateDuration / 1000});
-            localStorage.setItem('experimentResults', JSON.stringify(results));
+            const now = new Date();
+            results.push({
+                trial: currentTrial,
+                dateTime: now.toISOString(),
+                duration: stateDuration / 1000
+            });
+            
+            if (currentTrial < numTrials) {
+                startTrialBtn.style.display = 'inline';
+                message.textContent = `试验 ${currentTrial} 结束。状态持续时间：${stateDuration / 1000}秒。点击"开始试验"继续下一个试验。`;
+            } else {
+                showResults();
+            }
             
             stateDuration = 0;
         }
 
+        function showResults() {
+            experimentDiv.style.display = 'none';
+            resultsDiv.style.display = 'block';
+            let summary = '试验结果摘要:<br>';
+            results.forEach(result => {
+                summary += `试验 ${result.trial}: ${result.duration} 秒 (${new Date(result.dateTime).toLocaleString()})<br>`;
+            });
+            document.getElementById('resultsSummary').innerHTML = summary;
+        }
+
         function exportData() {
-            const data = localStorage.getItem('experimentResults');
-            if (data) {
-                const blob = new Blob([data], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'experiment_results.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } else {
-                alert('没有可导出的数据');
-            }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Trial,Date,Time,Duration (seconds)\n";
+            
+            results.forEach(result => {
+                const date = new Date(result.dateTime);
+                const dateStr = date.toLocaleDateString();
+                const timeStr = date.toLocaleTimeString();
+                csvContent += `${result.trial},${dateStr},${timeStr},${result.duration}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "experiment_results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function restart() {
+            resultsDiv.style.display = 'none';
+            setupDiv.style.display = 'block';
         }
     </script>
 </body>
